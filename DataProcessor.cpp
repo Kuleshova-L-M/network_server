@@ -40,9 +40,8 @@ void DataProcessor::process(int client_socket) {
         return;
     }
 
-    std::string salt = auth.genSalt();
-    std::string saltMsg = salt + "\n";
-    send(client_socket, saltMsg.c_str(), saltMsg.length(), 0);
+    std::string salt = auth.genSalt();;
+    send(client_socket, salt.c_str(), salt.length(), 0);
 
     bytesRead = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
     if (bytesRead <= 0) { close(client_socket); return; }
