@@ -5,6 +5,7 @@
 #include <cryptopp/filters.h>
 #include <sstream>
 #include <iomanip>
+#include <iostream>
 
 std::string Authenticator::genSalt() const {
     CryptoPP::AutoSeededRandomPool prng;
@@ -28,5 +29,17 @@ std::string Authenticator::calcHash(const std::string& salt, const std::string& 
 
 bool Authenticator::checkAuth(const std::string& login, const std::string& clientHash, const std::string& salt, const UserBase& users) const {
     if (!users.checkUser(login)) return false;
-    return calcHash(salt, users.getPass(login)) == clientHash;
+    
+    std::string serverPass = users.getPass(login);
+    std::string serverHash = calcHash(salt, serverPass);
+    
+    std::cout << "--- ОТЛАДКА АУТЕНТИФИКАЦИИ ---" << std::endl;
+    std::cout << "Соль (SALT):   '" << salt << "'" << std::endl;
+    std::cout << "Пароль с сервера: '" << serverPass << "'" << std::endl;
+    std::cout << "Строка для хэша:  '" << serverPass + salt << "'" << std::endl;
+    std::cout << "Хэш от клиента:   " << clientHash << std::endl;
+    std::cout << "Хэш на сервере:   " << serverHash << std::endl;
+    std::cout << "-------------------------------" << std::endl;
+
+    return serverHash == clientHash;
 }

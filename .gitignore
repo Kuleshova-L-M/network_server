@@ -1,12 +1,8 @@
 
-vcalc_server
 *.o
 *.out
+vcalc_server
+client_uint32_t
+client_float
 
-vcalc.log
 *.log
-build/
-
-html/
-latex/
-

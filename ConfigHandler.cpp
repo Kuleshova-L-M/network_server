@@ -6,7 +6,7 @@ ConfigHandler::ConfigHandler()
 {
     desc.add_options()
         ("help,h", "Показать справку")
-        ("config,C", po::value<std::string>(&configFile)->default_value("./vcalc.conf"), "Путь к базе клиентов")
+        ("config,c", po::value<std::string>(&configFile)->default_value("./vcalc.conf"), "Путь к базе клиентов")
         ("log,l", po::value<std::string>(&logFile)->default_value("./vcalc.log"), "Путь к файлу журнала")
         ("port,p", po::value<uint16_t>(&port)->default_value(33333), "TCP-порт сервера");
 }
