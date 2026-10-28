@@ -1,7 +1,7 @@
 TARGET = vcalc_server
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra
-LIBS = -lcryptopp -lpthread
+LIBS = -lcryptopp -lpthread -lboost_program_options
 
 SOURCES = main.cpp \
           ConfigHandler.cpp \
