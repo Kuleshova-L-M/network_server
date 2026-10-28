@@ -1,0 +1,12 @@
+
+vcalc_server
+*.o
+*.out
+
+vcalc.log
+*.log
+build/
+
+html/
+latex/
+
