@@ -1,6 +1,11 @@
-include "DataProcessor.h"
-#include <sys/socket.h>
+#include "DataProcessor.h"
+#include <cstdint>
+#include <string>
+#include <vector>
+#include <cstddef>
 #include <unistd.h>
+#include <sys/socket.h>
+
 
 DataProcessor::DataProcessor(UserBase& u, Authenticator& a, Logger& l)
     : users(u), auth(a), logger(l) {}
