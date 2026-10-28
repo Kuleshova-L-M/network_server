@@ -20,7 +20,7 @@ std::string Authenticator::calcHash(const std::string& salt, const std::string& 
     CryptoPP::SHA256 sha256;
     CryptoPP::StringSource(salt + pass, true,
         new CryptoPP::HashFilter(sha256,
-            new CryptoPP::HexEncoder(new CryptoPP::StringSink(digest), false)
+            new CryptoPP::HexEncoder(new CryptoPP::StringSink(digest), true)
         )
     );
     return digest;
