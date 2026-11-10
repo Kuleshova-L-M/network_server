@@ -6,3 +6,5 @@ client_uint32_t
 client_float
 
 *.log
+unit_tests
+
