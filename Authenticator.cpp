@@ -32,14 +32,5 @@ bool Authenticator::checkAuth(const std::string& login, const std::string& clien
     
     std::string serverPass = users.getPass(login);
     std::string serverHash = calcHash(salt, serverPass);
-    
-    std::cout << "--- ОТЛАДКА АУТЕНТИФИКАЦИИ ---" << std::endl;
-    std::cout << "Соль (SALT):   '" << salt << "'" << std::endl;
-    std::cout << "Пароль с сервера: '" << serverPass << "'" << std::endl;
-    std::cout << "Строка для хэша:  '" << serverPass + salt << "'" << std::endl;
-    std::cout << "Хэш от клиента:   " << clientHash << std::endl;
-    std::cout << "Хэш на сервере:   " << serverHash << std::endl;
-    std::cout << "-------------------------------" << std::endl;
-
     return serverHash == clientHash;
 }
