@@ -8,21 +8,25 @@
 DataProcessor::DataProcessor(UserBase& u, Authenticator& a, Logger& l) 
     : users(u), auth(a), logger(l) {}
 
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ (безопасная от переполнения)
 int32_t DataProcessor::calcProduct(const std::vector<uint32_t>& data) {
     if (data.empty()) return 1;
     
-    int64_t result = 1;
+    uint64_t result = 1;
     for (uint32_t val : data) {
-        result *= static_cast<int64_t>(val);
-        if (result > 2147483647LL) {
+        result *= val;
+        // Если переполнение вверх, возвращаем максимум int32
+        if (result > 2147483647ULL) {
             return 2147483647; 
         } 
-        if (result < -2147483648LL) {
-            return -2147483648;
+        // Если встретился ноль
+        if (result == 0) {
+            return 0;
         }
     }
     return static_cast<int32_t>(result);
 }
+
 bool recv_all(int socket, void* buffer, size_t length) {
     size_t total_received = 0;
     char* buf = static_cast<char*>(buffer);
@@ -76,14 +80,15 @@ void DataProcessor::process(int client_socket) {
         return;
     }
 
-
     for (uint32_t i = 0; i < vector_count; ++i) {
         uint32_t vector_len = 0;
         if (!recv_all(client_socket, &vector_len, sizeof(vector_len))) break;
+        
         std::vector<uint32_t> vec(vector_len);
         if (vector_len > 0) {
             if (!recv_all(client_socket, vec.data(), vector_len * sizeof(uint32_t))) break;
         }
+        
         int32_t calculation_result = calcProduct(vec);
         uint32_t results_count = 1;
         send(client_socket, &results_count, sizeof(results_count), 0);
