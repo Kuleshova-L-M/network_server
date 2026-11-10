@@ -20,7 +20,6 @@ void UserBase::load(const std::string& file) {
         if (pos != std::string::npos) {
             std::string login = line.substr(0, pos);
             std::string pass = line.substr(pos + 1);
-            std::cout << "Загружен пользователь: '" << login << "' с паролем: '" << pass << "'" << std::endl;
             users[login] = pass;
         }
     }
