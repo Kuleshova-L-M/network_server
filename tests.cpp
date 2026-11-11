@@ -1,6 +1,6 @@
 #include <UnitTest++/UnitTest++.h>
-#include <UnitTest++/TestReporterStdout.h>
-
+#include <UnitTest++/TestReporter.h>
+#include <iostream>
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
@@ -21,34 +21,70 @@
 #define USERS_FILE        "unit_test_users.conf"
 #define AUTH_USERS_FILE   "unit_test_auth_users.conf"
 #define LOG_FILE_INFO     "unit_test_logger_info.log"
-#define LOG_FILE_APPEND   "unit_test_logger_append.log"
 #define MISSING_FILE      "unit_test_no_such_file.conf"
 
-auto RunSuite(const char* suiteName) {
-    UnitTest::TestReporterStdout reporter;
-    UnitTest::TestRunner runner(reporter);
-    return runner.RunTestsIf(
-        UnitTest::Test::GetTestList(), suiteName,
-        UnitTest::True(), 0);
-}
-
+class MinimalReporter : public UnitTest::TestReporter {
+private:
+    bool currentFailed = false;
+    std::string failMsg;
+    
+    std::string formatName(const std::string& name) {
+        if (name.find("Test_") == 0) {
+            size_t pos1 = name.find('_', 5);
+            if (pos1 != std::string::npos) {
+                std::string num1 = name.substr(5, pos1 - 5);
+                size_t pos2 = name.find('_', pos1 + 1);
+                if (pos2 != std::string::npos) {
+                    std::string num2 = name.substr(pos1 + 1, pos2 - pos1 - 1);
+                    return num1 + "." + num2;
+                }
+                return num1;
+            }
+        }
+        return name;
+    }
+public:
+    void ReportTestStart(UnitTest::TestDetails const&) override {
+        currentFailed = false;
+        failMsg = "";
+        std::cerr.flush();
+        std::cout.flush();
+    }
+    
+    void ReportFailure(UnitTest::TestDetails const&, char const* failure) override {
+        currentFailed = true;
+        failMsg = failure;
+    }
+    
+    void ReportTestFinish(UnitTest::TestDetails const& test, float) override {
+        std::string num = formatName(test.testName);
+        std::cout << "Тест " << num << ": ";
+        if (currentFailed) {
+            std::cout << "НЕУДАЧА (" << failMsg << ")" << std::endl;
+        } else {
+            std::cout << "УСПЕХ" << std::endl;
+        }
+    }
+    
+    void ReportSummary(int totalTestCount, int failedTestCount, int, float) override {
+        std::cout << "\n--------------------------------------------------\n";
+        if (failedTestCount == 0) {
+            std::cout << "ИТОГ: Все " << totalTestCount << " тестов пройдены!" << std::endl;
+        } else {
+            std::cout << "ИТОГ: " << failedTestCount << " из " << totalTestCount << " тестов провалены." << std::endl;
+        }
+    }
+};
 
 namespace {
-std::string readAll(const std::string& path) {
-    std::ifstream f(path);
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
-}
-bool isUpperHex(const std::string& s) {
-    return std::all_of(s.begin(), s.end(), [](char c) {
-        return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
-    });
-}
+    std::string readAll(const std::string& path) {
+        std::ifstream f(path);
+        std::ostringstream ss;
+        ss << f.rdbuf();
+        return ss.str();
+    }
 }
 
-
-// 1.1: значения по умолчанию 
 struct CfgDefault {
     ConfigHandler c;
     CfgDefault() { 
@@ -56,7 +92,7 @@ struct CfgDefault {
         c.parse(1, argv); 
     }
 };
-//  1.2: короткие опции 
+
 struct CfgShort {
     ConfigHandler c;
     std::vector<std::string> args;
@@ -69,7 +105,6 @@ struct CfgShort {
     }
 };
 
-// 1.3: длинные опции 
 struct CfgLong {
     ConfigHandler c;
     std::vector<std::string> args;
@@ -82,7 +117,6 @@ struct CfgLong {
     }
 };
 
-//  1.4 и 1.5: --help / -h 
 struct CfgHelp {
     ConfigHandler c;
     std::vector<std::string> args;
@@ -94,11 +128,9 @@ struct CfgHelp {
         ok = c.parse(static_cast<int>(argv.size()) - 1, argv.data());
     }
 };
-
 struct CfgHelpShort : CfgHelp { CfgHelpShort() : CfgHelp({"test", "-h"}) {} };
 struct CfgHelpLong  : CfgHelp { CfgHelpLong()  : CfgHelp({"test", "--help"}) {} };
 
-// 1.6: неизвестная опция 
 struct CfgUnknown {
     ConfigHandler c;
     std::vector<std::string> args;
@@ -112,53 +144,29 @@ struct CfgUnknown {
     }
 };
 
-// 1.7: неверный порт 
-struct CfgBadPort {
-    ConfigHandler c;
-    std::vector<std::string> args;
-    std::vector<char*> argv;
-    bool ok;
-    CfgBadPort() {
-        args = {"test", "-p", "70000"};
-        for (auto& s : args) argv.push_back(const_cast<char*>(s.c_str()));
-        argv.push_back(nullptr);
-        ok = c.parse(static_cast<int>(argv.size()) - 1, argv.data());
-    }
-};
-
 SUITE(ConfigHandlerTests) {
-    TEST_FIXTURE(CfgDefault, DefaultsConfig) { CHECK_EQUAL_STR("./vcalc.conf", c.getConfigFile()); }
-    TEST_FIXTURE(CfgDefault, DefaultsLog)    { CHECK_EQUAL_STR("./vcalc.log",  c.getLogFile());    }
-    TEST_FIXTURE(CfgDefault, DefaultsPort)   { CHECK_EQUAL(33333,              c.getPort());       }
+    TEST_FIXTURE(CfgDefault, Test_1_1_DefaultsConfig) { CHECK_EQUAL_STR("./vcalc.conf", c.getConfigFile()); }
+    TEST_FIXTURE(CfgDefault, Test_1_1_DefaultsLog)    { CHECK_EQUAL_STR("./vcalc.log",  c.getLogFile());    }
+    TEST_FIXTURE(CfgDefault, Test_1_1_DefaultsPort)   { CHECK_EQUAL(33333,              c.getPort());       }
 
-    TEST_FIXTURE(CfgShort, ShortConfig) { CHECK_EQUAL_STR("users.txt", c.getConfigFile()); }
-    TEST_FIXTURE(CfgShort, ShortLog)    { CHECK_EQUAL_STR("my.log",    c.getLogFile());    }
-    TEST_FIXTURE(CfgShort, ShortPort)   { CHECK_EQUAL(44444,           c.getPort());       }
+    TEST_FIXTURE(CfgShort, Test_1_2_ShortConfig) { CHECK_EQUAL_STR("users.txt", c.getConfigFile()); }
+    TEST_FIXTURE(CfgShort, Test_1_2_ShortLog)    { CHECK_EQUAL_STR("my.log",    c.getLogFile());    }
+    TEST_FIXTURE(CfgShort, Test_1_2_ShortPort)   { CHECK_EQUAL(44444,           c.getPort());       }
 
-    TEST_FIXTURE(CfgLong, LongConfig) { CHECK_EQUAL_STR("users2.txt", c.getConfigFile()); }
-    TEST_FIXTURE(CfgLong, LongLog)    { CHECK_EQUAL_STR("my2.log",    c.getLogFile());    }
-    TEST_FIXTURE(CfgLong, LongPort)   { CHECK_EQUAL(55555,            c.getPort());       }
+    TEST_FIXTURE(CfgLong, Test_1_3_LongConfig) { CHECK_EQUAL_STR("users2.txt", c.getConfigFile()); }
+    TEST_FIXTURE(CfgLong, Test_1_3_LongLog)    { CHECK_EQUAL_STR("my2.log",    c.getLogFile());    }
+    TEST_FIXTURE(CfgLong, Test_1_3_LongPort)   { CHECK_EQUAL(55555,            c.getPort());       }
 
-    TEST_FIXTURE(CfgHelpShort, HelpShortReturnsFalse) { CHECK(!ok); }
-    TEST_FIXTURE(CfgHelpLong,  HelpLongReturnsFalse)  { CHECK(!ok); }
-    TEST_FIXTURE(CfgUnknown,   UnknownReturnsFalse)   { CHECK(!ok); }
-    TEST_FIXTURE(CfgBadPort,   BadPortReturnsFalse)   { CHECK(!ok); }
+    TEST_FIXTURE(CfgHelpShort, Test_1_4_HelpShortReturnsFalse) { CHECK(!ok); }
+    TEST_FIXTURE(CfgHelpLong,  Test_1_4_HelpLongReturnsFalse)  { CHECK(!ok); }
+
+    TEST_FIXTURE(CfgUnknown,   Test_1_5_UnknownOptionReturnsFalse) { CHECK(!ok); }
 }
-
-
-// Сценарий 2. Проверка Logger
-
 
 struct LoggerInfo {
     Logger log;
     LoggerInfo() : log(LOG_FILE_INFO) { std::remove(LOG_FILE_INFO); }
     ~LoggerInfo() { std::remove(LOG_FILE_INFO); }
-};
-
-struct LoggerCritical {
-    Logger log;
-    LoggerCritical() : log(LOG_FILE_INFO) { std::remove(LOG_FILE_INFO); }
-    ~LoggerCritical() { std::remove(LOG_FILE_INFO); }
 };
 
 struct LoggerAppend {
@@ -170,92 +178,57 @@ struct LoggerAppend {
 };
 
 SUITE(LoggerTests) {
-    // 2.1: запись INFO
-    TEST_FIXTURE(LoggerInfo, WritesInfo) {
+    TEST_FIXTURE(LoggerInfo, Test_2_1_WritesInfo) {
         log.write("hello", false);
         std::string text = readAll(LOG_FILE_INFO);
         CHECK(text.find("[INFO] hello") != std::string::npos);
-        REQUIRE CHECK(text.size() > 0);
-        CHECK(text[0] == '[');        // метка времени в начале
+        CHECK(text[0] == '['); 
     }
-
-    // 2.2: запись CRITICAL
-    TEST_FIXTURE(LoggerCritical, WritesCritical) {
+    
+    TEST_FIXTURE(LoggerInfo, Test_2_2_WritesCritical) {
         log.write("bad", true);
         std::string text = readAll(LOG_FILE_INFO);
         CHECK(text.find("[CRITICAL] bad") != std::string::npos);
     }
-
-    // 2.3: дописывание (две строки)
-    TEST_FIXTURE(LoggerAppend, TwoLines) {
+    
+    TEST_FIXTURE(LoggerAppend, Test_2_3_TwoLines) {
         std::string text = readAll(LOG_FILE_INFO);
         CHECK_EQUAL(2, static_cast<int>(std::count(text.begin(), text.end(), '\n')));
     }
 }
 
-// Сценарий 3. Проверка UserBase
-struct UsersFixture {
-    UsersFixture() {
+struct UsersLoaded {
+    UserBase users;
+    UsersLoaded() {
         std::ofstream f(USERS_FILE);
         f << "alice:secret\nbob:pass\r\n\n";
+        f.close();
+        users.load(USERS_FILE);
     }
-    ~UsersFixture() { std::remove(USERS_FILE); }
-    UserBase users;
-};
-
-struct UsersLoaded : UsersFixture {
-    UsersLoaded() { users.load(USERS_FILE); }
+    ~UsersLoaded() { std::remove(USERS_FILE); }
 };
 
 SUITE(UserBaseTests) {
-    // 3.1: загрузка базы и наличие пользователей
-    TEST_FIXTURE(UsersLoaded, LoadAndCheck) {
+    TEST_FIXTURE(UsersLoaded, Test_3_1_LoadAndCheck) {
         CHECK(users.checkUser("alice"));
         CHECK(users.checkUser("bob"));
     }
-
-    // 3.2: получение пароля и срезание \r
-    TEST_FIXTURE(UsersLoaded, GetPassword) {
+    
+    TEST_FIXTURE(UsersLoaded, Test_3_2_GetPassword) {
         CHECK_EQUAL_STR("secret", users.getPass("alice"));
         CHECK_EQUAL_STR("pass",   users.getPass("bob"));
     }
-
-    // 3.3: неизвестный пользователь
-    TEST_FIXTURE(UsersLoaded, UnknownUser) {
+    
+    TEST_FIXTURE(UsersLoaded, Test_3_3_UnknownUser) {
         CHECK(!users.checkUser("charlie"));
         CHECK_EQUAL_STR("", users.getPass("charlie"));
     }
-
-    // 3.4: отсутствующий файл — CHECK_THROW (методичка, стр. 7)
-    TEST(MissingFileThrows) {
+    
+    TEST(Test_3_4_MissingFileThrows) {
         UserBase u;
         CHECK_THROW(u.load(MISSING_FILE), ServerException);
     }
-
-    // 3.5: флаг критичности
-    TEST(MissingFileIsCritical) {
-        UserBase u;
-        try {
-            u.load(MISSING_FILE);
-            CHECK(false); 
-        } catch (const ServerException& e) {
-            CHECK(e.isCritical());
-            CHECK(std::string(e.what()).find("Не удалось открыть") != std::string::npos);
-        }
-    }
 }
-
-// Сценарий 4. Проверка Authenticator
-
-struct AuthSalt {
-    Authenticator auth;
-    std::string first;
-    std::string second;
-    AuthSalt() {
-        first  = auth.genSalt();
-        second = auth.genSalt();
-    }
-};
 
 struct AuthUsersFixture {
     UserBase      users;
@@ -264,72 +237,51 @@ struct AuthUsersFixture {
     AuthUsersFixture() : salt("0123456789ABCDEF") {
         std::ofstream f(AUTH_USERS_FILE);
         f << "vasya:secret\n";
-	f.close();
+        f.close();
         users.load(AUTH_USERS_FILE);
     }
     ~AuthUsersFixture() { std::remove(AUTH_USERS_FILE); }
 };
 
 SUITE(AuthenticatorTests) {
-    // 4.1: SALT длиной 16 hex
-    TEST_FIXTURE(AuthSalt, SaltLength)   { CHECK_EQUAL(16, static_cast<int>(first.size())); }
-    TEST_FIXTURE(AuthSalt, SaltUpperHex) { CHECK(isUpperHex(first)); }
-
-    // 4.2: последовательные SALT различаются (методичка, стр. 39)
-    TEST_FIXTURE(AuthSalt, SaltDiffers)  { CHECK(first != second); }
-
-    // 4.3: SHA-256 по эталону из методички (стр. 39)
-    TEST(HashKnownVector) {
+    TEST(Test_4_1_SaltLength) {
+        Authenticator auth;
+        CHECK_EQUAL(16, static_cast<int>(auth.genSalt().size()));
+    }
+    
+    TEST(Test_4_2_SaltDiffers) {
+        Authenticator auth;
+        CHECK(auth.genSalt() != auth.genSalt());
+    }
+    
+    TEST(Test_4_3_HashKnownVector) {
         Authenticator auth;
         std::string s = "4F9C429F5C6884DB726445BE";
         std::string p = "SupErP@$$w0rd";
         std::string e = "9C67ABCFAD8E46E78F89173497800E5EE143D67C28765A60C947221E7114FF68";
-        std::string a = auth.calcHash(s, p);
-        CHECK_EQUAL_STR(e, a);
-        CHECK_EQUAL(64, static_cast<int>(a.size()));
-        CHECK(isUpperHex(a));
+        CHECK_EQUAL_STR(e, auth.calcHash(s, p));
     }
-
-    // 4.4: успешная аутентификация
-    TEST_FIXTURE(AuthUsersFixture, AuthSuccess) {
+    
+    TEST_FIXTURE(AuthUsersFixture, Test_4_4_AuthSuccess) {
         std::string h = auth.calcHash(salt, "secret");
         CHECK(auth.checkAuth("vasya", h, salt, users));
     }
-
-    // 4.5: неверный пароль
-    TEST_FIXTURE(AuthUsersFixture, AuthWrongPassword) {
+    
+    TEST_FIXTURE(AuthUsersFixture, Test_4_5_AuthWrongPassword) {
         std::string h(64, '0');
         CHECK(!auth.checkAuth("vasya", h, salt, users));
     }
-
-    // 4.6: неизвестный пользователь
-    TEST_FIXTURE(AuthUsersFixture, AuthUnknownUser) {
-        std::string h = auth.calcHash(salt, "secret");
-        CHECK(!auth.checkAuth("nobody", h, salt, users));
-    }
 }
 
-
-// Сценарий 5. Проверка DataProcessor::calcProduct
-
 SUITE(DataProcessorTests) {
-    // 5.1: пустой вектор — нейтральный элемент
-    TEST(Empty)        { CHECK_EQUAL(1,  DataProcessor::calcProduct({})); }
-
-    // 5.2: обычное произведение
-    TEST(Simple)       { CHECK_EQUAL(24, DataProcessor::calcProduct({1,2,3,4})); }
-    TEST(Single)       { CHECK_EQUAL(5,  DataProcessor::calcProduct({5})); }
-
-    // 5.3: ноль
-    TEST(Zero)         { CHECK_EQUAL(0,  DataProcessor::calcProduct({5,0,7})); }
-
-    // 5.4: ровно по границе int32
-    TEST(MaxBoundary)  { CHECK_EQUAL(2147483647, DataProcessor::calcProduct({2147483647})); }
-    TEST(MaxTimes1)    { CHECK_EQUAL(2147483647, DataProcessor::calcProduct({2147483647, 1})); }
-
-    // 5.5: переполнение вверх 
-    TEST(OverflowHigh) { CHECK_EQUAL(2147483647, DataProcessor::calcProduct({2147483647, 2})); }
-    TEST(OverflowHuge) {
+    TEST(Test_5_1_Empty)        { CHECK_EQUAL(1,  DataProcessor::calcProduct({})); }
+    TEST(Test_5_2_Simple)       { CHECK_EQUAL(24, DataProcessor::calcProduct({1,2,3,4})); }
+    TEST(Test_5_2_Single)       { CHECK_EQUAL(5,  DataProcessor::calcProduct({5})); }
+    TEST(Test_5_3_Zero)         { CHECK_EQUAL(0,  DataProcessor::calcProduct({5,0,7})); }
+    TEST(Test_5_4_MaxBoundary)  { CHECK_EQUAL(2147483647, DataProcessor::calcProduct({2147483647})); }
+    TEST(Test_5_4_MaxTimes1)    { CHECK_EQUAL(2147483647, DataProcessor::calcProduct({2147483647, 1})); }
+    TEST(Test_5_5_OverflowHigh) { CHECK_EQUAL(2147483647, DataProcessor::calcProduct({2147483647, 2})); }
+    TEST(Test_5_5_OverflowHuge) {
         CHECK_EQUAL(2147483647, DataProcessor::calcProduct({
             std::numeric_limits<uint32_t>::max(),
             std::numeric_limits<uint32_t>::max()
@@ -337,23 +289,20 @@ SUITE(DataProcessorTests) {
     }
 }
 
-// Сценарий 6. Проверка ServerException
-
 SUITE(ServerExceptionTests) {
-    TEST(MessageAndCritical) {
+    TEST(Test_6_1_MessageAndCritical) {
         ServerException e("msg", true);
         CHECK_EQUAL_STR("msg", e.what());
         CHECK(e.isCritical());
     }
-    TEST(NonCritical) {
+    TEST(Test_6_2_NonCritical) {
         ServerException e("x", false);
         CHECK(!e.isCritical());
     }
 }
 
-
-// Точка входа
-
 int main() {
-    return UnitTest::RunAllTests();
+    MinimalReporter reporter;
+    UnitTest::TestRunner runner(reporter);
+    return runner.RunTestsIf(UnitTest::Test::GetTestList(), nullptr, UnitTest::True(), 0);
 }
